@@ -42,11 +42,13 @@ class Field {
         this.width = parseInt(this.xml.find("> bitWidth").text());
         this.offset = parseInt(this.xml.find("> bitOffset").text());
         this.mask = ((1 << this.width) - 1) << this.offset;
-        this.enumvalues = this.xml.find("> enumeratedValues > enumeratedValue");
     }
 
     html(){
-        console.log("please implement", this);
+        return $("<div>").addClass("col").append(
+            $("<div>").addClass("field-name").text(this.name),
+            this.input
+        );
     }
 
     register_updated(value){
@@ -70,48 +72,37 @@ class InputField extends Field {
         super(register, xml);
         this.input = $("<input>")
             .addClass("form-control field-value")
-            .change(this.handle_input_change);
+            .change(this.handle_input_change.bind(this));
     }
     handle_input_change(ev) {
-        this.update_register(parseInt(ev.value));
+        this.update_register(parseInt(this.input.val()));
     }
     update_field(fvalue){
         this.input.val(hex(fvalue));
-    }
-    html() {
-        return $("<div>").addClass("col").append(
-            $("<div>").addClass("field-name").text(this.name),
-            this.input
-        );
     }
 }
 
 class SelectField extends Field {
     constructor (register, xml) {
         super(register, xml);
-        var select = this.select = $("<select>") 
+        this.enumvalues = this.xml.find("> enumeratedValues > enumeratedValue");
+        this.input = $("<select>") 
             .addClass("form-control field-value")
-            .change(this.handle_select_change.bind(this));
-        $.each(this.enumvalues, function(i, xml){
+            .change(this.handle_input_change.bind(this));
+        $.each(this.enumvalues, (function(i, xml){
             var enumval = $(xml);
             var name = enumval.find("> name").text();
             var value = parseInt(enumval.find("> value").text());
-            select.append(
+            this.input.append(
                 $("<option>").text(name).attr("value", value)
             );
-        });
+        }).bind(this));
     }
-    handle_select_change(ev) {
-        this.update_register(parseInt(this.select.val()));
+    handle_input_change(ev) {
+        this.update_register(parseInt(this.input.val()));
     }
     update_field(fvalue){
-        this.select.val(fvalue);
-    }
-    html() {
-        return $("<div>").addClass("container").append(
-            $("<div>").addClass("field-name").text(this.name),
-            this.select
-        );
+        this.input.val(fvalue);
     }
 }
 
@@ -132,12 +123,6 @@ class CheckboxField extends Field {
     }
     update_field(fvalue) {
         this.input.prop('checked', fvalue);
-    }
-    html() {
-        return $("<div>").addClass("container").append(
-            $("<div>").addClass("field-name").text(this.name),
-            this.input
-        );
     }
 }
 
@@ -190,6 +175,8 @@ class Register {
     }
 
     html() {
+        this.read();
+
         var card = $("<div>").addClass("card register"); 
         
         card.append(
@@ -218,17 +205,11 @@ class Register {
         var body = $("<div>").addClass("card-body row");
         
         $.each_reversed(this.fields, function(i, field){
-            body.append(
-                $("<div>").addClass("col").append(
-                    field.html()
-                )
-            );
+            body.append(field.html());
         });
-
 
         card.append(body);
 
-        this.read();
         return card;
     }
     
@@ -243,14 +224,6 @@ class Peripheral {
     }
     show () {
         $(".register").remove();
-/*
-        $(".peripheral-name").remove();
-        $("#registers").append(
-            $("<h2>")
-                .addClass("peripheral-name")
-                .text(this.description)
-        );
-*/
         this.xml.find("> registers > register").each((function(i, xml) {
             $("#registers").append(
                 new Register(this, xml).html()
